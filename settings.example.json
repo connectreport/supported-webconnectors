@@ -1,0 +1,15 @@
+{
+  "connectors": [
+    {
+      "name": "BigQuery",
+      "type": "bigquery",
+      "config": {
+        "DATABASE": "bigquery-public-data.thelook_ecommerce"
+      },
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "bigquery-connectreport",
+        "GOOGLE_APPLICATION_CREDENTIALS": "key.json"
+      }
+    }
+  ]
+}
