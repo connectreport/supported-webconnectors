@@ -2,15 +2,17 @@
 This repo houses the Web Connector services for ConnectReport's supported Web Connectors. 
 
 # Install
-Open cmd.exe within a working directory and run the following:
+Open Powershell and execute the following:
 ```
-@echo off
-set "url=https://raw.githubusercontent.com/connectreport/supported-webconnectors/main/install.ps1"
-set "outputFile=install.ps1"
+cd Documents
+mkdir "ConnectReport Web Connectors"
+cd "./ConnectReport Web Connectors"
+$scriptUrl = "https://raw.githubusercontent.com/connectreport/supported-webconnectors/main/install.ps1"
+$outputFile = "install.ps1"
 
-echo Downloading script...
-curl %url% --output %outputFile%
+# Download the script
+Invoke-WebRequest -Uri $scriptUrl -OutFile $outputFile
 
-echo Running script as administrator...
-powershell -ExecutionPolicy Bypass -File %outputFile%
+# Run the downloaded script as administrator
+Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$outputFile`"" -Verb RunAs
 ```
