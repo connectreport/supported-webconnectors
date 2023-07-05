@@ -2,16 +2,18 @@ import { Field } from "./Field";
 import { FieldValue } from "./FieldValues";
 import { Selections } from "./Selections";
 import { TableResponse } from "./TableResponse";
+import { User } from "./User";
 
 export abstract class SqlService {
   public abstract getTable(
+    user: User,
     fields: Field[],
     limit: number,
     tableName?: string,
     selections?: Selections
   ): Promise<TableResponse>;
 
-  public abstract listTableColumns(tableName?: string): Promise<{
+  public abstract listTableColumns(user: User, tableName?: string): Promise<{
     name: string;
     fields: Field[];
   }>;
@@ -19,22 +21,23 @@ export abstract class SqlService {
   public abstract listTables(): Promise<string[]>;
 
   public abstract getFieldValues(
+    user: User,
     field: string,
     search?: string,
     tableName?: string
   ): Promise<FieldValue[]>;
 
-  async getMetadata() {
+  async getMetadata(user: User) {
     let tables: { name: string; fields: Field[] }[] = [];
 
     const tableList = await this.listTables();
     if (tableList && tableList.length > 0) {
       let promises = tableList.map(async (table) =>
-        this.listTableColumns(table)
+        this.listTableColumns(user, table)
       );
       tables = await Promise.all(promises);
     } else {
-      tables = [await this.listTableColumns()];
+      tables = [await this.listTableColumns(user)];
     }
 
     return {

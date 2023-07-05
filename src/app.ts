@@ -3,9 +3,9 @@ import { User } from "./models/User";
 import { getTableHandler } from "./handlers/getTable";
 import { getMetadataHandler } from "./handlers/getMetadata";
 import { getFieldValuesHandler } from "./handlers/getFieldValues";
-import { debug } from "./util";
+import { logger } from "./util";
 import { inspect } from "util";
-import { getConnector } from "./connectors";
+import { getConnector, settings } from "./connectors";
 import express, { json, Router } from "express";
 import path from "path";
 
@@ -15,12 +15,16 @@ const router = Router();
 app.use("/public", express.static(path.join(process.cwd(), "/public")));
 app.use(json(), router);
 
-
-debug("Public directory: ", path.join(process.cwd(), "/public"));
+logger.info("Public directory", { dir: path.join(process.cwd(), "/public") });
 
 router.use("/:connector/*", (req, res, next) => {
   const { connector } = req.params;
-  debug("Received request", connector, req.url, inspect(req.body));
+  logger.debug("Received request", {
+    connector,
+    url: req.originalUrl,
+    body: req.body,
+    ip: req.ip,
+  });
   if (!getConnector(connector)) {
     return res.status(404).json({ error: "Unknown connector" });
   }
@@ -78,7 +82,6 @@ router.post("/:connector/getFieldValues", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("listening on *:3000");
-  console.log("Web connector listening on 3000", "– Debug:", process.env.DEBUG);
+app.listen(settings.port || 3000, () => {
+  logger.info("Web connector listening on 3000", "– Debug:", process.env.DEBUG);
 });

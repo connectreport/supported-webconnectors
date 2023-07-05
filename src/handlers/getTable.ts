@@ -1,8 +1,6 @@
 import { TableRequest } from "../models/TableRequest";
 import { TableResponse, TableCell } from "../models/TableResponse";
 import { User } from "../models/User";
-import { inspect } from "util";
-import { debug } from "../util";
 import { SqlService } from "../models/SqlService";
 import { formatCell, formatTable } from "../formatter";
 
@@ -12,12 +10,8 @@ export const getTableHandler = async (
   user: User,
   sqlService: SqlService
 ): Promise<TableResponse> => {
-  debug(
-    "Received getTable request",
-    inspect(request, { compact: false, depth: 5, breakLength: 80 }),
-    inspect(user)
-  );
   const response = await sqlService.getTable(
+    user,
     request.fields,
     request.height,
     request.tableName,

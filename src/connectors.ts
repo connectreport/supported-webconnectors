@@ -3,7 +3,7 @@ import { BigQuery } from "./connectors/bigQuery";
 import { SqlService } from "./models/SqlService";
 import path from "path";
 
-const settings: { connectors: ConnectorDef[] } = JSON.parse(
+export const settings: { port?: number; logLevel?: string, connectors: ConnectorDef[] } = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), "settings.json"), "utf8")
 );
 

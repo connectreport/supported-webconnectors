@@ -9,9 +9,10 @@ import { SqlService } from "../models/SqlService";
 import { Field } from "../models/Field";
 import { FieldValue } from "../models/FieldValues";
 import { Selections } from "../models/Selections";
-import { debug } from "../util";
+import { logger } from "../util";
 import { TableResponse, TableRow } from "../models/TableResponse";
 import Knex from "knex";
+import { User } from "../models/User";
 
 const knex = Knex({
   client: "pg",
@@ -29,21 +30,14 @@ export class BigQuery extends SqlService {
     super();
     this.DATABASE = DATABASE;
     this.LOCATION = LOCATION;
-    // environemnt variables set directly by the node process
-    //process.env["GOOGLE_CLOUD_PROJECT"] = ACCOUNT_IDENTIFIER;
-    // const keyPath = path.join(process.cwd(), "$HOME/.config/gcloud/application_default_credentials.json")
 
-    this.bigqueryClient = new BigQueryLib({
-      // maxRetries:
-    });
+    this.bigqueryClient = new BigQueryLib();
   }
-  /** Send query to Databricks */
+
   async makeQuery(query: string): Promise<any> {
     const options = {
       query,
-      // Location must match that of the dataset(s) referenced in the query.
       location: this.LOCATION,
-      //   params: { corpus: "romeoandjuliet", min_word_count: 250 },
     };
 
     try {
@@ -51,13 +45,13 @@ export class BigQuery extends SqlService {
       const out = rows.map((row) => Object.values(row));
       return out;
     } catch (e) {
-      debug(e);
+      logger.error(e);
       throw e;
     }
   }
 
   /** list columns names in table */
-  public async listTableColumns(tableName: string): Promise<{
+  public async listTableColumns(user: User, tableName: string): Promise<{
     name: string;
     fields: Field[];
   }> {
@@ -96,6 +90,7 @@ export class BigQuery extends SqlService {
 
   /** list unique field values for a field defintion, useful for filters */
   public async getFieldValues(
+    user: User,
     field: string,
     search?: string
   ): Promise<FieldValue[]> {
@@ -158,6 +153,7 @@ export class BigQuery extends SqlService {
 
   /** output a table with the provided fields and filters applied */
   public async getTable(
+    user: User,
     fields: Field[],
     limit: number = 100,
     tableName: string,

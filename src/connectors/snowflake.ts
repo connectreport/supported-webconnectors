@@ -3,10 +3,11 @@ import { Field } from "../models/Field";
 import { FieldValue } from "../models/FieldValues";
 import { Selections } from "../models/Selections";
 import { SqlService } from "../models/SqlService";
-import { debug } from "../util";
+import { logger } from "../util";
 
 import axiosRetry from "axios-retry";
 import { TableResponse } from "../models/TableResponse";
+import { User } from "../models/User";
 
 axiosRetry(axios, { retries: 3 });
 
@@ -102,7 +103,7 @@ export class Snowflake extends SqlService {
   }
 
   /** list columns names in table */
-  async listTableColumns(tableName?: string): Promise<{
+  async listTableColumns(user: User, tableName?: string): Promise<{
     name: string;
     fields: Field[];
   }> {
@@ -136,6 +137,7 @@ export class Snowflake extends SqlService {
 
   /** list unique field values for a field defintion, useful for filters */
   async getFieldValues(
+    user: User,
     field: string,
     search?: string,
     tableName?: string
@@ -162,6 +164,7 @@ export class Snowflake extends SqlService {
 
   /** output a table with the provided fields and filters applied */
   async getTable(
+    user: User,
     fields: Field[],
     limit: number = 100,
     tableName: string = this.DEFAULT_TABLE_NAME,
@@ -216,7 +219,7 @@ export class Snowflake extends SqlService {
     let attempts = 0;
     while (elapsedTime < timeout) {
       const results = await this.checkQuery(id, wait);
-      debug(
+      logger.debug(
         `try attempt ${attempts} over ${Math.floor(elapsedTime / 1000)} seconds`
       );
       const data = this.getData(results);
