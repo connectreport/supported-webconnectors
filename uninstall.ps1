@@ -1,1 +1,1 @@
-.\nssm.exe remove crWebConnectorServiceManager confirm
+..\nssm.exe remove crWebConnectorServiceManager confirm

@@ -1,4 +1,4 @@
-# Define the download URL for the Node.js installer
+ # Define the download URL for the Node.js installer
 $installerUrl = "https://nodejs.org/dist/latest-v16.x/node-v16.20.1-x64.msi"
 $nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
 $repoUrl = "https://github.com/connectreport/supported-webconnectors/archive/refs/heads/main.zip"
@@ -51,7 +51,7 @@ Remove-Item -Path "$(Get-Location)\nssm-2.24" -Recurse
 $Binary = (Get-Command Powershell).Source
 
 # The necessary arguments, including the path to our script
-.\nssm.exe install crWebConnectorServiceManager $Binary '-ExecutionPolicy Bypass -NoProfile -File ".\start.ps1"'
+.\nssm.exe install crWebConnectorServiceManager $Binary '-ExecutionPolicy Bypass -NoProfile -File ".\repo\start.ps1"'
 .\nssm.exe set crWebConnectorServiceManager DisplayName "ConnectReport Web Connector Service Manager"
 .\nssm.exe set crWebConnectorServiceManager Start SERVICE_DELAYED_AUTO_START 
 .\nssm.exe set crWebConnectorServiceManager AppDirectory $(Get-Location)
@@ -59,3 +59,4 @@ $Binary = (Get-Command Powershell).Source
 .\nssm.exe set crWebConnectorServiceManager AppStdErr "$(Get-Location)\logs\service-error.log"
 
 Write-Host "Service installed"
+ 
