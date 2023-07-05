@@ -7,9 +7,7 @@
     "ts": "tsc",
     "start": "node dist/app.js",
     "dev": " NODE_ENV=dev DEBUG=true node dist/app.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "install-windows-service": "node dist/service-manager.js install",
-    "uninstall-windows-service": "node dist/service-manager.js uninstall"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",

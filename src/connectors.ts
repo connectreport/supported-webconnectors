@@ -1,12 +1,17 @@
-const settings: { connectors: ConnectorDef[] } = require("../settings.json");
+import fs from "fs";
 import { BigQuery } from "./connectors/bigQuery";
 import { SqlService } from "./models/SqlService";
+import path from "path";
+
+const settings: { connectors: ConnectorDef[] } = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "settings.json"), "utf8")
+);
 
 export type ConnectorDef = {
   name: string;
   type: "databricks" | "snowflake" | "bigquery";
   config: any;
-  env: { [key: string]: string}
+  env: { [key: string]: string };
   sqlService: SqlService;
 };
 
