@@ -15,9 +15,8 @@ Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
 
 $nodeInstallDir = "$(Get-Location)\node"
 
-
 # Install Node.js
-Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$installerPath`" /qn nodeInstallDir=`"$nodeInstallDir`"" -Wait
+Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$installerPath`" /qn INSTALLDIR=`"$nodeInstallDir`"" -Wait 
 
 # Verify the installation
 Write-Host "Node.js has been configured"
