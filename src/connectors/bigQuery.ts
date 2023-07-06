@@ -13,6 +13,7 @@ import { logger } from "../util";
 import { TableResponse, TableRow } from "../models/TableResponse";
 import Knex from "knex";
 import { User } from "../models/User";
+import { AggregationDef } from "../connectors";
 
 const knex = Knex({
   client: "pg",
@@ -21,15 +22,25 @@ const knex = Knex({
   },
 });
 
+export type MappedField = Field & {
+  raw?: any;
+};
+
 export class BigQuery extends SqlService {
   bigqueryClient: BigQueryLib;
   DATABASE: string;
   LOCATION: string;
+  aggregations?: AggregationDef[];
 
-  constructor(DATABASE: string, LOCATION: string) {
+  constructor(
+    DATABASE: string,
+    LOCATION: string,
+    aggregations?: AggregationDef[]
+  ) {
     super();
     this.DATABASE = DATABASE;
     this.LOCATION = LOCATION;
+    this.aggregations = aggregations;
 
     this.bigqueryClient = new BigQueryLib();
   }
@@ -51,7 +62,10 @@ export class BigQuery extends SqlService {
   }
 
   /** list columns names in table */
-  public async listTableColumns(user: User, tableName: string): Promise<{
+  public async listTableColumns(
+    user: User,
+    tableName: string
+  ): Promise<{
     name: string;
     fields: Field[];
   }> {
@@ -62,13 +76,31 @@ export class BigQuery extends SqlService {
       )
       .toString();
     const res: any[][] = await this.makeQuery(query);
+
+    let additionalFields: Field[] = [];
+    if (this.aggregations) {
+      additionalFields = this.aggregations
+        .filter((a) => a.sourceTable === tableName)
+        .map((a) => ({
+          fieldName: a.fieldIdentifier,
+          fieldDef: a.fieldIdentifier,
+          fieldType: a.fieldType as "dimension" | "measure",
+        }));
+    }
+
     return {
       name: tableName,
-      fields: res.map((row) => ({
+      fields: [
+        ...res.map(
+          (row) =>
+            ({
         fieldName: `${tableName}.${row[0]}`,
         fieldDef: `${tableName}.${row[0]}`,
         fieldType: row[1] === "STRING" ? "dimension" : "measure",
-      })),
+            } as Field)
+        ),
+        ...additionalFields,
+      ],
     };
   }
   /** list databases available in warehouse */
@@ -125,7 +157,7 @@ export class BigQuery extends SqlService {
    * with a non-null value for measure fields with a totalsFunction  */
   async getTotals(
     tableName: string,
-    fields: Field[],
+    fields: MappedField[],
     query: string
   ): Promise<TableRow> {
     if (!fields.find((f) => f.totalsFunction)) {
@@ -137,7 +169,11 @@ export class BigQuery extends SqlService {
         fields.reduce((acc: any, f) => {
           if (f.fieldType === "measure") {
             if (f.totalsFunction && allowedTotals.includes(f.totalsFunction)) {
+              if (f.raw) {
+                acc.push(knex.raw(`${f.totalsFunction}(${f.raw.toString()}`));
+              } else {
               acc.push(knex.raw(`${f.totalsFunction}(??)`, [f.fieldDef]));
+              }
             } else {
               acc.push(knex.raw(`NULL`));
             }
@@ -168,8 +204,21 @@ export class BigQuery extends SqlService {
           }
         });
       }
+      const mappedFields: MappedField[] = fields.map((f) => {
+        const field: MappedField = { ...f };
+        if (this.aggregations) {
+          const isAgg = this.aggregations.find(
+            (a) => a.fieldIdentifier === f.fieldDef
+          );
+          if (isAgg) {
+            field.raw = knex.raw(isAgg.sql);
+          }
+        }
+        return field;
+      });
+
       const query = knex
-        .distinct(fields.map((f) => f.fieldDef))
+        .distinct(mappedFields.map((f) => f.raw || f.fieldDef))
         .from(`${this.DATABASE}.${tableName}`)
         .orderBy(orderBy)
         .limit(limit)
@@ -211,7 +260,7 @@ export class BigQuery extends SqlService {
         table: out,
         grandTotalRow: await this.getTotals(
           tableName,
-          fields,
+          mappedFields,
           query.toString()
         ),
         size: {

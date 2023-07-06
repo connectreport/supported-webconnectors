@@ -7,12 +7,15 @@ export const settings: { port?: number; logLevel?: string, connectors: Connector
   fs.readFileSync(path.join(process.cwd(), "settings.json"), "utf8")
 );
 
+export type AggregationDef = { sourceTable: string, fieldType: string; fieldIdentifier: string, sql: string };
+
 export type ConnectorDef = {
   name: string;
   type: "databricks" | "snowflake" | "bigquery";
   config: any;
   env: { [key: string]: string };
   sqlService: SqlService;
+  aggregations?: AggregationDef[];
 };
 
 export const connectors = settings.connectors.map((c) => {
@@ -25,7 +28,7 @@ export const connectors = settings.connectors.map((c) => {
   let sqlService: SqlService;
   switch (c.type) {
     case "bigquery":
-      sqlService = new BigQuery(c.config.DATABASE, c.config.LOCATION);
+      sqlService = new BigQuery(c.config.DATABASE, c.config.LOCATION, c.aggregations);
       break;
     default:
       throw new Error(`Unknown connector type ${c.type}`);
