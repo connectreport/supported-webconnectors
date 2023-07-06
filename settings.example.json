@@ -5,7 +5,8 @@
       "name": "BigQuery",
       "type": "bigquery",
       "config": {
-        "DATABASE": "bigquery-public-data.thelook_ecommerce"
+        "DATABASE": "bigquery-public-data.thelook_ecommerce",
+        "LOCATION": "US"
       },
       "env": {
         "GOOGLE_CLOUD_PROJECT": "bigquery-connectreport",
