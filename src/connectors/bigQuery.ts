@@ -160,7 +160,7 @@ export class BigQuery extends SqlService {
           .toString()
       );
       return res.map((row: Array<{ value: string } | string>) => {
-        if (typeof row[0] === "object" && row[0].value) {
+        if (typeof row[0] === "object" && row[0]?.value) {
           return { text: row[0].value };
         } else {
           return { text: row[0] as string };
