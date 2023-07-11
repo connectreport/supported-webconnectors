@@ -14,6 +14,7 @@ import { TableResponse, TableRow } from "../models/TableResponse";
 import Knex from "knex";
 import { User } from "../models/User";
 import { AggregationDef } from "../connectors";
+import { isNumber } from "lodash";
 
 const knex = Knex({
   client: "pg",
@@ -275,6 +276,9 @@ export class BigQuery extends SqlService {
           if (cell !== null && typeof cell === "object") {
             if (cell["value"]) {
               return { text: cell["value"] };
+              // @ts-ignore
+            } else if (cell.constructor?.name === "Big") {
+              return { text: cell + "", number: cell };
             } else {
               return { text: Object.values(cell)[0] as string };
             }
