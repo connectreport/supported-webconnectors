@@ -1,7 +1,7 @@
 export type PlaceholderType = "rowSpan" | "columnSpan" | "leftOfHeader";
 export type TableCell = {
   text?: string;
-  number?: string;
+  number?: number;
   level?: number;
   isPlaceholder?: boolean;
   placeholderType?: PlaceholderType;

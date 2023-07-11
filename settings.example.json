@@ -1,5 +1,6 @@
 {
   "logLevel": "debug",
+  "locale": "en-US",
   "connectors": [
     {
       "name": "BigQuery",

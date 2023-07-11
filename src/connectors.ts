@@ -1,11 +1,11 @@
 import fs from "fs";
-import { BigQuery } from "./connectors/bigQuery";
-import { SqlService } from "./models/SqlService";
 import path from "path";
-
-export const settings: { port?: number; logLevel?: string, connectors: ConnectorDef[] } = JSON.parse(
+export const settings: { port?: number; locale?: string; logLevel?: string, connectors: ConnectorDef[] } = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), "settings.json"), "utf8")
 );
+import { BigQuery } from "./connectors/bigQuery";
+import { SqlService } from "./models/SqlService";
+
 
 export type AggregationDef = { sourceTable: string, fieldType: string; fieldIdentifier: string, sql: string };
 
