@@ -9,5 +9,6 @@ export type Field = {
   formatStyle?: string;
   sortOrder?: string;
   totalsFunction?: "Min" | "Max" | "Avg" | "Sum" | "Count";
+  tableName?: string;
 };
 export type Fields = Array<Field>;

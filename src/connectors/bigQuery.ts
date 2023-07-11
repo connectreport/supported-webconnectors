@@ -84,6 +84,7 @@ export class BigQuery extends SqlService {
         .map((a) => ({
           fieldName: a.fieldIdentifier,
           fieldDef: a.fieldIdentifier,
+          tableName: tableName,
           fieldType: a.fieldType as "dimension" | "measure",
         }));
     }
@@ -94,9 +95,10 @@ export class BigQuery extends SqlService {
         ...res.map(
           (row) =>
             ({
-        fieldName: `${tableName}.${row[0]}`,
-        fieldDef: `${tableName}.${row[0]}`,
-        fieldType: row[1] === "STRING" ? "dimension" : "measure",
+              fieldName: `${tableName}.${row[0]}`,
+              fieldDef: `${row[0]}`,
+              tableName: tableName,
+              fieldType: row[1] === "STRING" ? "dimension" : "measure",
             } as Field)
         ),
         ...additionalFields,
@@ -124,19 +126,31 @@ export class BigQuery extends SqlService {
   public async getFieldValues(
     user: User,
     field: string,
-    search?: string
+    search?: string,
+    tableName?: string
   ): Promise<FieldValue[]> {
-    const tableName = field.split(".")[0];
-    const columnName = field.split(".")[1];
+    const columnName = field;
     const searchClause = search
       ? knex.raw("CAST(?? AS string) LIKE ?", [columnName, `%${search}%`])
       : null;
+    let raw;
+
+    const isAgg = this.aggregations?.find((a) => a.fieldIdentifier === field);
+    if (isAgg) {
+      raw = knex.raw(`${isAgg.sql} as value`);
+    }
+
+    const resolvedCol = raw || columnName;
+
     try {
       const res: string[][] = await this.makeQuery(
         knex
-          .distinct(columnName)
+          .distinct(resolvedCol)
           .from(`${this.DATABASE}.${tableName}`)
-          .orderBy(columnName, "asc")
+          .orderBy(
+            typeof resolvedCol === "string" ? resolvedCol : "value",
+            "asc"
+          )
           .limit(1000)
           .modify((query) => {
             if (searchClause) {
@@ -145,9 +159,13 @@ export class BigQuery extends SqlService {
           })
           .toString()
       );
-      return res.map((row) => ({
-        text: row[0],
-      }));
+      return res.map((row: Array<{ value: string } | string>) => {
+        if (typeof row[0] === "object" && row[0].value) {
+          return { text: row[0].value };
+        } else {
+          return { text: row[0] as string };
+        }
+      });
     } catch (e) {
       return [];
     }
@@ -172,7 +190,7 @@ export class BigQuery extends SqlService {
               if (f.raw) {
                 acc.push(knex.raw(`${f.totalsFunction}(${f.raw.toString()}`));
               } else {
-              acc.push(knex.raw(`${f.totalsFunction}(??)`, [f.fieldDef]));
+                acc.push(knex.raw(`${f.totalsFunction}(??)`, [f.fieldDef]));
               }
             } else {
               acc.push(knex.raw(`NULL`));
@@ -224,8 +242,17 @@ export class BigQuery extends SqlService {
         .limit(limit)
         .modify((query) => {
           selections.forEach((s) => {
+            let resolvedCol: any = s.fieldDef;
+            if (this.aggregations) {
+              const isAgg = this.aggregations.find(
+                (a) => a.fieldIdentifier === s.fieldDef
+              );
+              if (isAgg) {
+                resolvedCol = knex.raw(isAgg.sql);
+              }
+            }
             query.whereIn(
-              s.fieldDef,
+              resolvedCol,
               s.fieldValues.map((v) => v.text)
             );
           });

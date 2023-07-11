@@ -43,12 +43,7 @@ export abstract class SqlService {
     return {
       tables,
       filterFields: tables.flatMap((table) =>
-        table.fields.reduce((acc, field) => {
-          if (field.fieldType === "dimension") {
-            acc.push(field);
-          }
-          return acc;
-        }, [] as Field[])
+        table.fields
       ).sort((a, b) => (a.fieldName || a.fieldDef).localeCompare(b.fieldName || b.fieldDef)),
     };
   }

@@ -8,13 +8,15 @@
       "type": "node",
       "request": "launch",
       "name": "Launch Program",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "preLaunchTask": "tsc: build - tsconfig.json",
+      "env": { "NODE_ENV": "dev"},
       "program": "${workspaceFolder}/dist/app.js",
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
+      "outFiles": ["${workspaceFolder}/**/*.js"],
+      "outputCapture": "std",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
       ]
     }
   ]
