@@ -17,6 +17,21 @@ Invoke-WebRequest -Uri $scriptUrl -OutFile $outputFile
 Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$outputFile`"" -Verb RunAs
 ```
 
+## Update
+Open PowerShell and execute the following:
+```
+cd Documents
+cd "./ConnectReport Web Connectors"
+$scriptUrl = "https://raw.githubusercontent.com/connectreport/supported-webconnectors/main/update.ps1"
+$outputFile = "update.ps1"
+
+# Download the script
+Invoke-WebRequest -Uri $scriptUrl -OutFile $outputFile
+
+# Run the downloaded script as administrator
+Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$outputFile`"" -Verb RunAs
+```
+
 ## Aggregations 
 You can add aggregation to a connector as follows
 ```
