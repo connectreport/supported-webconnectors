@@ -5,7 +5,7 @@
 // All requests need to qualify the dataset
 
 import { BigQuery as BigQueryLib } from "@google-cloud/bigquery";
-import { SqlService } from "../models/SqlService";
+import { MappedField, SqlService } from "../models/SqlService";
 import { Field } from "../models/Field";
 import { FieldValue } from "../models/FieldValues";
 import { Selections } from "../models/Selections";
@@ -23,9 +23,6 @@ const knex = Knex({
   },
 });
 
-export type MappedField = Field & {
-  raw?: any;
-};
 
 export class BigQuery extends SqlService {
   bigqueryClient: BigQueryLib;
@@ -128,7 +125,9 @@ export class BigQuery extends SqlService {
     user: User,
     field: string,
     search?: string,
-    tableName?: string
+    tableName?: string,
+    height?: number,
+    top?: number
   ): Promise<FieldValue[]> {
     const columnName = field;
     const searchClause = search
@@ -152,7 +151,8 @@ export class BigQuery extends SqlService {
             typeof resolvedCol === "string" ? resolvedCol : "value",
             "asc"
           )
-          .limit(1000)
+          .limit(height || 300)
+          .offset(top || 0)
           .modify((query) => {
             if (searchClause) {
               query.where(searchClause);

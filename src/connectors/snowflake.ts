@@ -2,255 +2,331 @@ import axios from "axios";
 import { Field } from "../models/Field";
 import { FieldValue } from "../models/FieldValues";
 import { Selections } from "../models/Selections";
-import { SqlService } from "../models/SqlService";
+import { MappedField, SqlService } from "../models/SqlService";
+import Knex from "knex";
+import { TableResponse, TableRow } from "../models/TableResponse";
+import { User } from "../models/User";
+import snowflake from "snowflake-sdk";
+import type { Pool } from "generic-pool";
+import { AggregationDef } from "../connectors";
 import { logger } from "../util";
 
-import axiosRetry from "axios-retry";
-import { TableResponse } from "../models/TableResponse";
-import { User } from "../models/User";
+const knex = Knex({
+  client: "pg",
+  wrapIdentifier: (value, origImpl, queryContext) => {
+    return `\"${value}\"`;
+  },
+});
 
-axiosRetry(axios, { retries: 3 });
+class Deferred {
+  resolve: any;
+  reject: any;
+  promise: Promise<any>;
+  constructor() {
+    this.promise = new Promise((res, rej) => {
+      this.resolve = res;
+      this.reject = rej;
+    });
+  }
+}
 
 export class Snowflake extends SqlService {
-  statementURL = "/api/v2/statements";
-  counter = 0;
-  API_KEY: string;
-  BASEURL: string;
-  DEFAULT_TABLE_NAME: string;
-  POLL_WAIT_MS: number;
-  POLL_TIMEOUT_MS: number;
-  DEFAULT_DATABASE: string;
-  DEFAULT_SCHEMA: string;
+  connection: snowflake.Connection;
+  DATABASE: string;
+  SCHEMA: string;
+  aggregations?: AggregationDef[];
 
   constructor(
-    BASE_URL: string,
-    API_KEY: string,
-    POLL_WAIT_MS: number,
-    POLL_TIMEOUT_MS: number,
-    DEFAULT_TABLE_NAME: string,
-    DEFAULT_SCHEMA: string,
-    DEFAULT_DATABASE: string
+    ACCOUNT: string,
+    DATABASE: string,
+    USERNAME: string,
+    PASSWORD: string,
+    SCHEMA: string,
+    aggregations?: AggregationDef[]
   ) {
     super();
-    this.API_KEY = API_KEY;
-    this.BASEURL = BASE_URL;
-    this.POLL_WAIT_MS = POLL_WAIT_MS;
-    this.POLL_TIMEOUT_MS = POLL_TIMEOUT_MS;
-    this.DEFAULT_TABLE_NAME = DEFAULT_TABLE_NAME;
-    this.DEFAULT_SCHEMA = DEFAULT_SCHEMA;
-    this.DEFAULT_DATABASE = DEFAULT_DATABASE;
+
+    this.DATABASE = DATABASE;
+    this.SCHEMA = SCHEMA;
+    this.aggregations = aggregations;
+
+    this.connection = snowflake.createConnection(
+      // connection options
+      {
+        account: ACCOUNT,
+        username: USERNAME,
+        password: PASSWORD,
+        database: DATABASE,
+      }
+    );
+    this.connection.connect((err, conn) => {
+      if (err) {
+        logger.error("Failed to connect to snowflake", { err });
+      } else {
+        logger.info("Successfully connected to Snowflake.");
+      }
+    });
   }
 
-  buildHeader(key: string) {
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-      Accept: "application/json",
-      "User-Agent": "ConnectReport-WebConnector/0.1.0",
-      "X-Snowflake-Authorization-Token-Type": "KEYPAIR_JWT",
-    };
-  }
-  getData(response: any) {
-    return response?.data?.data;
-  }
-  getId(response: any) {
-    return response?.data?.statementHandle;
-  }
-  isValidRequest(response: any) {
-    if (
-      !(
-        response?.status == 200 &&
-        response?.data?.message == "Statement executed successfully."
-      )
-    ) {
-      throw new Error(`Request failed: ${response?.data?.message}`);
-    }
-  }
-
-  /** Send query to Databricks */
+  /** Send query to Snowflake */
   async makeQuery(query: string): Promise<any> {
-    const options = {
-      baseURL: this.BASEURL,
-      // path: "/api/2.1/unity-catalog/tables",
-      // path: "/api/2.0/workspace/get-status",
-      // path: "/api/2.0/sql/warehouses/", // list warehouse ids
-      url: this.statementURL,
-      // url: "/api/2.0/sql/statements/",
-      method: "POST",
-      data: {
-        statement: query,
-        // warehouse_id: WAREHOUSE_ID,
-        // warehouse: WAREHOUSE_ID,
-        database: this.DEFAULT_DATABASE.toUpperCase(),
-        schema: this.DEFAULT_SCHEMA.toUpperCase(),
+    const d = new Deferred();
+    // Use the connection pool and execute a statement
+    this.connection.execute({
+      sqlText: query,
+      fetchAsString: ["Boolean", "Number", "Date", "JSON", "Buffer"],
+      complete: function (err, stmt, rows) {
+        if (err) {
+          d.reject(err);
+        }
+        d.resolve(rows?.map((row) => Object.values(row)));
       },
-      headers: this.buildHeader(this.API_KEY),
-    };
-    const response = await axios.request(options);
-    this.isValidRequest(response);
-
-    const data = this.getData(response);
-    if (data) {
-      return data;
-    } else {
-      const id = this.getId(response);
-      return await this.loopCheckQuery(
-        id,
-        this.POLL_WAIT_MS,
-        this.POLL_TIMEOUT_MS
-      );
-    }
+    });
+    return d.promise;
   }
 
   /** list columns names in table */
-  async listTableColumns(user: User, tableName?: string): Promise<{
+  public async listTableColumns(
+    user: User,
+    tableName: string
+  ): Promise<{
     name: string;
     fields: Field[];
   }> {
-    const res: string[][] = await this.makeQuery(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='${
-        this.DEFAULT_SCHEMA
-      }' AND TABLE_NAME='${tableName || this.DEFAULT_TABLE_NAME}'`
-    );
-    const tableFinalName = tableName || this.DEFAULT_TABLE_NAME;
-    const fields = res.map((row) => ({
-      fieldName: row[0],
-      fieldDef: tableFinalName + "." + row[0],
-    }));
+    const query = knex
+      .raw(
+        `SELECT COLUMN_NAME, DATA_TYPE FROM ??.INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME=? and TABLE_SCHEMA=?;`,
+        [this.DATABASE, tableName, this.SCHEMA]
+      )
+      .toString();
+    const res: any[][] = await this.makeQuery(query);
+
+    let additionalFields: Field[] = [];
+    if (this.aggregations) {
+      additionalFields = this.aggregations
+        .filter((a) => a.sourceTable === tableName)
+        .map((a) => ({
+          fieldName: a.fieldIdentifier,
+          fieldDef: a.fieldIdentifier,
+          tableName: tableName,
+          fieldType: a.fieldType as "dimension" | "measure",
+        }));
+    }
+
     return {
-      name: tableFinalName,
-      fields,
+      name: tableName,
+      fields: [
+        ...res.map(
+          (row) =>
+            ({
+              fieldName: `${tableName}.${row[0]}`,
+              fieldDef: `${row[0]}`,
+              tableName: tableName,
+              fieldType: row[1] === "TEXT" ? "dimension" : "measure",
+            } as Field)
+        ),
+        ...additionalFields,
+      ],
     };
-  }
-  /** list databases available in warehouse */
-  async listDatabases(): Promise<string[]> {
-    const res: string[][] = await this.makeQuery(`SHOW DATABASES`);
-    return res.map((row) => row[0]);
   }
 
   /** list tables available in warehouse */
-  async listTables(): Promise<string[]> {
-    const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='${this.DEFAULT_SCHEMA}'`;
+  public async listTables(): Promise<string[]> {
+    const query = knex
+      .select("TABLE_NAME")
+      .from("INFORMATION_SCHEMA.TABLES")
+      .where("TABLE_SCHEMA", this.SCHEMA)
+      .toString();
     const res: string[][] = await this.makeQuery(query);
     return res.map((row) => row[0]);
   }
 
   /** list unique field values for a field defintion, useful for filters */
-  async getFieldValues(
+  public async getFieldValues(
     user: User,
     field: string,
     search?: string,
-    tableName?: string
+    tableName?: string,
+    height?: number,
+    top?: number
   ): Promise<FieldValue[]> {
-    // if no table provided attempt to split field into table and field
-    if (!tableName) {
-      const fieldSplit = field.split(".");
-      if (fieldSplit.length > 1) {
-        tableName = fieldSplit[0];
-        field = fieldSplit[1];
-      }
+    const columnName = field;
+    const searchClause = search
+      ? knex.raw("CAST(?? AS string) LIKE ?", [columnName, `%${search}%`])
+      : null;
+    let raw;
+
+    const isAgg = this.aggregations?.find((a) => a.fieldIdentifier === field);
+    if (isAgg) {
+      raw = knex.raw(`${isAgg.sql} as value`);
     }
 
-    const searchClause = search ? ` WHERE ${field} LIKE '%${search}%'` : "";
-    const tableNameConcat = `${this.DEFAULT_SCHEMA}.${
-      tableName || this.DEFAULT_TABLE_NAME
-    }`;
-    const query = `SELECT DISTINCT ${field} FROM ${tableNameConcat}${searchClause} ORDER BY ${field} ASC LIMIT 1000;`;
-    const res: string[][] = await this.makeQuery(query);
-    return res.map((row) => ({
-      text: row[0],
-    }));
+    const resolvedCol = raw || columnName;
+
+    try {
+      const res: string[][] = await this.makeQuery(
+        knex
+          .distinct(resolvedCol)
+          .from(`${this.SCHEMA}.${tableName}`)
+          .orderBy(
+            typeof resolvedCol === "string" ? resolvedCol : "value",
+            "asc"
+          )
+          .limit(height || 300)
+          .offset(top || 0)
+          .modify((query) => {
+            if (searchClause) {
+              query.where(searchClause);
+            }
+          })
+          .toString()
+      );
+      return res.map((row: Array<{ value: string } | string>) => {
+        if (typeof row[0] === "object" && row[0]?.value) {
+          return { text: row[0].value };
+        } else {
+          return { text: row[0] as string };
+        }
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** Must return a value for every measure,
+   * with a non-null value for measure fields with a totalsFunction  */
+  async getTotals(
+    tableName: string,
+    fields: MappedField[],
+    query: string
+  ): Promise<TableRow> {
+    if (!fields.find((f) => f.totalsFunction)) {
+      return [];
+    }
+    const allowedTotals = ["Sum", "Avg", "Count", "Min", "Max"];
+    const aggQuery = knex
+      .select(
+        fields.reduce((acc: any, f) => {
+          if (f.fieldType === "measure") {
+            if (f.totalsFunction && allowedTotals.includes(f.totalsFunction)) {
+              if (f.raw) {
+                acc.push(knex.raw(`${f.totalsFunction}(${f.raw.toString()}`));
+              } else {
+                acc.push(knex.raw(`${f.totalsFunction}(??)`, [f.fieldDef]));
+              }
+            } else {
+              acc.push(knex.raw(`NULL`));
+            }
+          }
+          return acc;
+        }, [])
+      )
+      .from(knex.raw(`(${query}) as ${tableName}`))
+      .toString();
+    const res: string[][] = await this.makeQuery(aggQuery);
+    return res[0].map((r, i) => ({ text: r }));
   }
 
   /** output a table with the provided fields and filters applied */
-  async getTable(
+  public async getTable(
     user: User,
     fields: Field[],
     limit: number = 100,
-    tableName: string = this.DEFAULT_TABLE_NAME,
+    tableName: string,
     selections: Selections = []
   ): Promise<TableResponse> {
-    let where = "";
-    const tableQuery = `${this.DEFAULT_SCHEMA}.${tableName}`;
-    if (selections.length) {
-      where = ` WHERE 1=1`;
-      selections.forEach((s) => {
-        const valueLength = s.fieldValues.length;
-        const clause = s.fieldValues.map(
-          (v, i) =>
-            `${s.fieldDef} = '${v.text}' ${i < valueLength - 1 ? "OR" : ""}`
-        );
-        if (valueLength > 1) {
-          where += `AND (${clause.join(" ")})`;
-        } else {
-          where += ` AND ${clause[0]}`;
+    try {
+      let orderBy: { column: string; order: string }[] = [];
+      if (fields.find((f) => f.sortOrder)) {
+        fields.map((f) => {
+          if (f.sortOrder) {
+            orderBy.push({ column: f.fieldDef, order: f.sortOrder });
+          }
+        });
+      }
+      const mappedFields: MappedField[] = fields.map((f) => {
+        const field: MappedField = { ...f };
+        if (this.aggregations) {
+          const isAgg = this.aggregations.find(
+            (a) => a.fieldIdentifier === f.fieldDef
+          );
+          if (isAgg) {
+            field.raw = knex.raw(isAgg.sql);
+          }
         }
+        return field;
       });
-    }
-    const query = `SELECT ${fields
-      .map((f) => f.fieldDef)
-      .join(",")} FROM ${tableQuery}${where} LIMIT ${limit};`;
-    console.log("query", query);
-    const res: string[][] = await this.makeQuery(query);
-    if (!res.length || !res[0].length) {
+
+      const query = knex
+        .distinct(
+          mappedFields.map((f, index) => f.raw || `${f.fieldDef} as c${index}`)
+        )
+        .from(`${this.SCHEMA}.${tableName}`)
+        .orderBy(orderBy)
+        .limit(limit)
+        .modify((query) => {
+          selections.forEach((s) => {
+            let resolvedCol: any = s.fieldDef;
+            if (this.aggregations) {
+              const isAgg = this.aggregations.find(
+                (a) => a.fieldIdentifier === s.fieldDef
+              );
+              if (isAgg) {
+                resolvedCol = knex.raw(isAgg.sql);
+              }
+            }
+            query.whereIn(
+              resolvedCol,
+              s.fieldValues.map((v) => v.text)
+            );
+          });
+        });
+
+      const res: string[][] = await this.makeQuery(query.toString());
+      if (!res.length || !res[0].length) {
+        return {
+          table: [],
+          grandTotalRow: [],
+          size: {
+            width: 0,
+            height: 0,
+          },
+        };
+      }
+      const out = res.map((row) =>
+        row.map((cell) => {
+          // if object and not null
+          if (cell !== null && typeof cell === "object") {
+            if (cell["value"]) {
+              return { text: cell["value"] };
+              // @ts-ignore
+            } else if (cell.constructor?.name === "Big") {
+              return { text: cell + "", number: cell };
+            } else {
+              return { text: Object.values(cell)[0] as string };
+            }
+          } else {
+            return { text: cell };
+          }
+        })
+      );
       return {
-        table: [],
-        grandTotalRow: [],
+        table: out,
+        grandTotalRow: await this.getTotals(
+          tableName,
+          mappedFields,
+          query.toString()
+        ),
         size: {
-          width: 0,
-          height: 0,
+          width: out[0]?.length || 0,
+          height: out.length,
         },
       };
-    }
-    const out = res.map((row) => row.map((cell) => ({ text: cell })));
-    return {
-      table: out,
-      grandTotalRow: [],
-      size: {
-        width: out[0]?.length,
-        height: out.length,
-      },
-    };
-  }
-
-  /** Auto check for pending query until completed */
-  async loopCheckQuery(id: string, wait: number, timeout: number) {
-    let elapsedTime = 0;
-    let attempts = 0;
-    while (elapsedTime < timeout) {
-      const results = await this.checkQuery(id, wait);
-      logger.debug(
-        `try attempt ${attempts} over ${Math.floor(elapsedTime / 1000)} seconds`
-      );
-      const data = this.getData(results);
-      if (data) {
-        return data;
-      } else {
-        elapsedTime += wait;
-        attempts++;
+    } catch (err: any) {
+      if (err.message.includes("Unrecognized name")) {
+        err.disableRetry = true;
       }
+      throw err;
     }
-    throw new Error(
-      `Request timeout after elapsed ${Math.floor(timeout / 1000)} seconds`
-    );
-  }
-
-  /** Check query status */
-  checkQuery(id: string, wait: number): Promise<any> {
-    // console.log("got id", id);
-    const promise = new Promise((resolve, reject) => {
-      setTimeout(async () => {
-        this.counter++;
-        console.log("counter", this.counter);
-        const results = await axios.request({
-          baseURL: this.BASEURL,
-          url: `${this.statementURL}/${id}`,
-          method: "GET",
-          headers: this.buildHeader(this.API_KEY),
-        });
-        resolve(results);
-      }, wait);
-    });
-    return promise;
   }
 }

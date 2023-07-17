@@ -5,6 +5,7 @@ export const settings: { port?: number; locale?: string; logLevel?: string, conn
 );
 import { BigQuery } from "./connectors/bigQuery";
 import { SqlService } from "./models/SqlService";
+import { Snowflake } from "./connectors/snowflake";
 
 
 export type AggregationDef = { sourceTable: string, fieldType: string; fieldIdentifier: string, sql: string };
@@ -29,6 +30,9 @@ export const connectors = settings.connectors.map((c) => {
   switch (c.type) {
     case "bigquery":
       sqlService = new BigQuery(c.config.DATABASE, c.config.LOCATION, c.aggregations);
+      break;
+    case "snowflake":
+      sqlService = new Snowflake(c.config.ACCOUNT, c.config.DATABASE, c.config.USERNAME, c.config.PASSWORD, c.config.SCHEMA, c.aggregations);
       break;
     default:
       throw new Error(`Unknown connector type ${c.type}`);

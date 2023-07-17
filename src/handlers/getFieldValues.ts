@@ -14,7 +14,9 @@ export const getFieldValuesHandler = async (
     user,
     options.field.fieldDef,
     options.search,
-    options.field.tableName
+    options.field.tableName,
+    options.height,
+    options.top,
   );
   return {
     fieldValues: result,

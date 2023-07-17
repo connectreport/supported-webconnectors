@@ -44,6 +44,7 @@ router.post("/:connector/getTable", async (req, res) => {
     );
     return res.json(tableResponse);
   } catch (err: any) {
+    logger.error("Error getting table", { err })
     res
       .status(500)
       .json({ message: err.message, disableRetry: err.disableRetry });
@@ -61,6 +62,7 @@ router.post("/:connector/getMetadata", async (req, res) => {
     const output = res.json(response);
     return output;
   } catch (err) {
+    logger.error("Error getting metadata", { err })
     res.status(500).json({ error: "Unknown" });
   }
 });
@@ -78,6 +80,7 @@ router.post("/:connector/getFieldValues", async (req, res) => {
     );
     return res.json(response);
   } catch (err) {
+    logger.error("Error getting field values", { err })
     res.status(500).json({ error: "Unknown" });
   }
 });

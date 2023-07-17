@@ -54,3 +54,44 @@ You can add aggregation to a connector as follows
   ]
 }
 ```
+
+## Snowflake Integration 
+The Snowflake integration supports password based authentication. 
+
+> _Future support for Key Pair Authentication may allow the integration to access Snowflake on behalf of users and enforce role-based access controls using Snowflake permissions._
+
+In your settings.json file, configure the integration as indicated below, replacing `ACCOUNT`, `DATABASE`, `SCHEMA`, `USERNAME`, and `PASSWORD` with the appropriate values. 
+
+```
+{
+  "connectors": [
+    {
+      "name": "Snowflake",
+      "type": "snowflake",
+      "config": {
+        "ACCOUNT": "example.us-east-1",
+        "DATABASE": "SNOWFLAKE_SAMPLE_DATA",
+        "SCHEMA": "TPCH_SF1",
+        "USERNAME": "EXAMPLE",
+        "PASSWORD": "password"
+      }
+    }
+  ]
+}
+```
+
+To gather the `ACCOUNT` value:
+- Navigate to Snowsight
+- Open the account selector and review the list of accounts that you have previously signed in to.
+- Locate the account for which you want to connect.
+- Hover over the account to view additional details and select the link icon to copy the account URL to your clipboard.
+
+![Account selector](images/account-selector.png)
+
+- Your clipboard will contain a value like `https://example.us-east-1.snowflakecomputing.com`. 
+
+  Copy the value between `https://` and `.snowflakecomputing.com` 
+
+  In this example, the `ACCOUNT` value is `example.us-east-1`
+
+

@@ -4,6 +4,11 @@ import { Selections } from "./Selections";
 import { TableResponse } from "./TableResponse";
 import { User } from "./User";
 
+
+export type MappedField = Field & {
+  raw?: any;
+};
+
 export abstract class SqlService {
   public abstract getTable(
     user: User,
@@ -24,7 +29,9 @@ export abstract class SqlService {
     user: User,
     field: string,
     search?: string,
-    tableName?: string
+    tableName?: string,
+    height?: number,
+    top?: number
   ): Promise<FieldValue[]>;
 
   async getMetadata(user: User) {
