@@ -32,6 +32,17 @@ Invoke-WebRequest -Uri $scriptUrl -OutFile $outputFile
 Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$outputFile`"" -Verb RunAs
 ```
 
+## Logs 
+Logs are persisted to `C:\ProgramData\ConnectReport\log\native-webconnectors` and rotated daily. You can use these logs to identify any issues configuring connectors. 
+
+You can adjust the log level in `settings.json`, using the top level key `logLevel`. Valid values are `"debug"`, `"info"`, and `"error"`. 
+
+## Locale
+You can configure the locale for currency and date formatting from `settings.json` using the top level key `locale`. 
+
+Supported locales are `en-US` and `en-gb`. 
+
+
 ## Aggregations 
 You can add aggregation to a connector as follows
 ```
@@ -54,6 +65,42 @@ You can add aggregation to a connector as follows
   ]
 }
 ```
+
+## Google BigQuery Integration 
+The BigQuery integration supports [Google's Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials) (ADC) authentication strategy. 
+
+Setup steps:
+-	Run the first two commands [here](https://codelabs.developers.google.com/codelabs/cloud-bigquery-nodejs#3) to create a BigQuery service account in Google Cloud. These commands may be executed from the Google Cloud Shell Terminal 
+- Running outside of GCP? You will need to run the third command [here](https://codelabs.developers.google.com/codelabs/cloud-bigquery-nodejs#3) to create a key file that ADC will recognize
+- Running in GCP? Associate the service account with the ConnectReport virtual machine in Google Cloud 
+  -	Edit the virtual machine 
+  - Under Identity and API access > Service Account, choose the service account created in the previous step
+- Within C:\Documents\ConnectReport Web Connectors\repo, create a new file named `settings.json`. Update contents as follows:
+```
+{
+  "connectors": [
+    {
+      "name": "BigQuery",
+      "type": "bigquery",
+      "config": {
+        "DATABASE": "bigquery-public-data.thelook_ecommerce",
+        "LOCATION": "US"
+      },
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "bigquery-connectreport",
+        "GOOGLE_APPLICATION_CREDENTIALS": "key.json"
+      }
+    }
+  ]
+}
+```
+- Within the new settings.json file:
+  - Update `env.GOOGLE_CLOUD_PROJECT `to the name of your GCP Project
+  - If running inside GCP, Remove `env.GOOGLE_APPLICATION_CREDENTIALS`. If running outside of GCP, you will need to point `env.GOOGLE_APPLICATION_CREDENTIALS` to the path to the keyfile created in step 3 above
+  - Update `config.DATABASE` to the name of your database 
+- Restart ConnectReport Web Connector Service Manager service
+
+
 
 ## Snowflake Integration 
 The Snowflake integration supports password based authentication. 
@@ -94,4 +141,4 @@ To gather the `ACCOUNT` value:
 
   In this example, the `ACCOUNT` value is `example.us-east-1`
 
-
+Once your settings.json file is updated, restart the ConnectReport Web Connector Service Manager service
