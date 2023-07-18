@@ -5,7 +5,7 @@ export interface TableRequest {
   fields: Fields;
   height: number;
   top: number;
-  selections?: Selections;
-  tableName?: string;
+  selections: Selections;
+  tableName: string;
   debug?: boolean;
 }

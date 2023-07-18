@@ -13,8 +13,8 @@ export const getFieldValuesHandler = async (
   let result = await sqlService.getFieldValues(
     user,
     options.field.fieldDef,
+    options.field.tableName!,
     options.search,
-    options.field.tableName,
     options.height,
     options.top,
   );
