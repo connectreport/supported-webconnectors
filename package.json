@@ -22,6 +22,7 @@
     "luxon": "^3.3.0",
     "node-windows": "^1.0.0-beta.8",
     "numeral": "^2.0.6",
+    "serialize-error": "^7.0.1",
     "snowflake-sdk": "^1.6.23",
     "winston": "^3.9.0",
     "winston-daily-rotate-file": "^4.7.1"
