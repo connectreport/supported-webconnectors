@@ -1,10 +1,10 @@
- # Define the download URL for the Node.js installer
-$installerUrl = "https://nodejs.org/dist/latest-v16.x/node-v16.20.1-x64.msi"
+  # Define the download URL for the Node.js installer
+$installerUrl = "https://nodejs.org/dist/latest-v16.x/node-v16.20.1-win-x64.zip"
 $nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
 $repoUrl = "https://github.com/connectreport/supported-webconnectors/archive/refs/heads/main.zip"
 
 # Define the path to download and save the installer
-$installerPath = "$env:TEMP\node-v$nodeVersion-x64.msi"
+$installerPath = "$env:TEMP\node-v$nodeVersion-x64.zip"
 $repoZipPath = "$(Get-Location)\repo.zip"
 $repoUnzipPath = "$(Get-Location)"
 $repoPath = "$(Get-Location)\repo"
@@ -13,10 +13,14 @@ $nssmZipPath = "$env:TEMP\nssm.zip"
 # Download the Node.js installer
 Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
 
-$nodeInstallDir = "$(Get-Location)\node"
+$nodeInstallDir = "$(Get-Location)"
 
 # Install Node.js
-Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$installerPath`" /qn INSTALLDIR=`"$nodeInstallDir`"" -Wait 
+Expand-Archive -Path $installerPath -DestinationPath $nodeInstallDir 
+
+Rename-Item -Path "$($nodeInstallDir)\node-v16.20.1-win-x64" -NewName  "node"
+
+$nodeInstallDir = "$(Get-Location)\node"
 
 # Verify the installation
 Write-Host "Node.js has been configured"
@@ -59,4 +63,5 @@ $Binary = (Get-Command Powershell).Source
 .\nssm.exe set crWebConnectorServiceManager AppStdErr "$(Get-Location)\logs\service-error.log"
 
 Write-Host "Service installed"
+ 
  
