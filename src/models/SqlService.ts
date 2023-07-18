@@ -104,14 +104,14 @@ export abstract class SqlService {
           }
         });
       }
-      const mappedFields: MappedField[] = fields.map((f) => {
+      const mappedFields: MappedField[] = fields.map((f, index) => {
         const field: MappedField = { ...f };
         if (this.aggregations) {
           const isAgg = this.aggregations.find(
             (a) => a.fieldIdentifier === f.fieldDef
           );
           if (isAgg) {
-            field.raw = knex.raw(isAgg.sql);
+            field.raw = knex.raw(isAgg.sql + " as c" + index);
           }
         }
         return field;
