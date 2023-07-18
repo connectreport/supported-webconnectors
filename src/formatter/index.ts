@@ -7,10 +7,12 @@ import { settings } from "../connectors";
 import { logger } from "../util";
 
 if (settings.locale) {
-  if (settings.locale !== "en-gb") {
+  if (!["en-us", "en-gb"].includes(settings.locale)) {
     logger.error("Unsupported locale", { locale: settings.locale });
   }
-  numeral.locale(settings.locale);
+  if (settings.locale !== "en-us") {
+    numeral.locale(settings.locale);
+  }
 }
 
 export const formatTable = (
@@ -32,7 +34,11 @@ export const formatCell = (cell: TableCell, field: Fields[number]) => {
       text: "-",
     };
   }
-  if (cell.text && !isNaN(parseFloat(cell.text)) && field.fieldType === "measure") {
+  if (
+    cell.text &&
+    !isNaN(parseFloat(cell.text)) &&
+    field.fieldType === "measure"
+  ) {
     cell.number = parseFloat(cell.text);
   }
   if (

@@ -40,7 +40,7 @@ You can adjust the log level in `settings.json`, using the top level key `logLev
 ## Locale
 You can configure the locale for currency and date formatting from `settings.json` using the top level key `locale`. 
 
-Supported locales are `en-US` and `en-gb`. 
+Supported locales are `en-us` and `en-gb`. 
 
 
 ## Aggregations 
