@@ -99,8 +99,8 @@ export abstract class SqlService {
       let orderBy: { column: string; order: string }[] = [];
       if (fields.find((f) => f.sortOrder)) {
         fields.map((f) => {
-          if (f.sortOrder) {
-            orderBy.push({ column: f.fieldDef, order: f.sortOrder });
+          if (f.sortOrder && f.sortOrder !== "auto") {
+            orderBy.push({ column: f.fieldDef, order: f.sortOrder === "descending" ? "DESC" : "ASC" });
           }
         });
       }
