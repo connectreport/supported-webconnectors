@@ -57,6 +57,7 @@ export class Snowflake extends SqlService {
         username: USERNAME,
         password: PASSWORD,
         database: DATABASE,
+        clientSessionKeepAlive: true
       }
     );
     this.connection.connect((err, conn) => {

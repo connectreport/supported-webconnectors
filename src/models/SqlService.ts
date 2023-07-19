@@ -123,7 +123,7 @@ export abstract class SqlService {
         )
         .from(from)
         .orderBy(orderBy)
-        .limit(limit)
+        .limit(limit || 1000)
         .modify((query) => {
           selections.forEach((s) => {
             let resolvedCol: any = s.fieldDef;
@@ -187,7 +187,7 @@ export abstract class SqlService {
       if (err.message.includes("Unrecognized name")) {
         err.disableRetry = true;
         // Snowflake
-      } else if (err.message.includse("SQL compilation error")) {
+      } else if (err.message.includes("SQL compilation error")) {
         err.disableRetry = true;
       }
       throw err;
