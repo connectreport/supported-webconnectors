@@ -1,6 +1,6 @@
 {
   "name": "@connectreport/supported-webconnectors",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "",
   "main": "app.js",
   "scripts": {

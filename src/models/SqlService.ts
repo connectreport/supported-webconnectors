@@ -8,6 +8,7 @@ import { AggregationDef } from "../connectors";
 
 export type MappedField = Field & {
   raw?: any;
+  isAgg?: boolean;
 };
 
 export abstract class SqlService {
@@ -95,15 +96,8 @@ export abstract class SqlService {
     try {
       let from = this.schema ? `${this.schema}.${tableName}` : tableName;
       from = this.databaseName ? `${this.databaseName}.${from}` : from;
+      let includesAgg = false; 
 
-      let orderBy: { column: string; order: string }[] = [];
-      if (fields.find((f) => f.sortOrder)) {
-        fields.map((f) => {
-          if (f.sortOrder && f.sortOrder !== "auto") {
-            orderBy.push({ column: f.fieldDef, order: f.sortOrder === "descending" ? "DESC" : "ASC" });
-          }
-        });
-      }
       const mappedFields: MappedField[] = fields.map((f, index) => {
         const field: MappedField = { ...f };
         if (this.aggregations) {
@@ -111,11 +105,26 @@ export abstract class SqlService {
             (a) => a.fieldIdentifier === f.fieldDef
           );
           if (isAgg) {
-            field.raw = knex.raw(isAgg.sql + " as c" + index);
+            field.raw = knex.raw(`${isAgg.sql} as ${knex.client.config.wrapIdentifier(`c${index}`)}`);
+            field.isAgg = true;
+            includesAgg = true;
           }
         }
         return field;
       });
+
+      let orderBy: { column: string; order: string }[] = [];
+      // create order by clause
+      if (fields.find((f) => f.sortOrder)) {
+        mappedFields.map((f, index) => {
+          if (f.sortOrder && f.sortOrder !== "auto") {
+            orderBy.push({
+              column: `c${index}`,
+              order: f.sortOrder === "descending" ? "DESC" : "ASC",
+            })
+          }
+        });
+      }
 
       const query = knex
         .distinct(
@@ -140,6 +149,15 @@ export abstract class SqlService {
               s.fieldValues.map((v) => v.text)
             );
           });
+        }).modify((query) => {
+          // if there are aggregations, group by all non-aggregation fields 
+          if (includesAgg) { 
+            mappedFields.forEach((f, index) => {
+              if (!f.isAgg) {
+                query.groupBy(`c${index}`);
+              }
+            });
+          }
         });
 
       const res: string[][] = await this.makeQuery(query.toString());
