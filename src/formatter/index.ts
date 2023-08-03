@@ -35,7 +35,7 @@ export const formatCell = (cell: TableCell, field: Fields[number]) => {
     };
   }
   if (
-    cell.text &&
+    typeof cell.text !== "undefined" &&
     !isNaN(parseFloat(cell.text)) &&
     field.fieldType === "measure"
   ) {
@@ -44,14 +44,14 @@ export const formatCell = (cell: TableCell, field: Fields[number]) => {
   if (
     field.fieldType === "measure" &&
     (field.format === "M" || field.format === "F") &&
-    cell.text &&
+    typeof cell.text !== "undefined" &&
     field.formatStyle
   ) {
     return { ...cell, text: numeral(cell.text).format(field.formatStyle) };
   } else if (
     field.fieldType === "measure" &&
     field.format === "D" &&
-    cell.text &&
+    typeof cell.text !== "undefined" &&
     field.formatStyle
   ) {
     return {
