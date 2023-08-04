@@ -1,6 +1,6 @@
 {
   "name": "@connectreport/supported-webconnectors",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "",
   "main": "app.js",
   "scripts": {
@@ -24,6 +24,7 @@
     "numeral": "^2.0.6",
     "serialize-error": "^7.0.1",
     "snowflake-sdk": "^1.6.23",
+    "uuid": "^9.0.0",
     "winston": "^3.9.0",
     "winston-daily-rotate-file": "^4.7.1"
   },
@@ -35,6 +36,7 @@
     "@types/node-windows": "^0.1.2",
     "@types/numeral": "^2.0.2",
     "@types/snowflake-sdk": "^1.6.13",
+    "@types/uuid": "^9.0.2",
     "typescript": "^5.0.4"
   }
 }

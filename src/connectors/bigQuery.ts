@@ -5,16 +5,11 @@
 // All requests need to qualify the dataset
 
 import { BigQuery as BigQueryLib } from "@google-cloud/bigquery";
-import { MappedField, SqlService } from "../models/SqlService";
-import { Field } from "../models/Field";
-import { FieldValue } from "../models/FieldValues";
-import { Selections } from "../models/Selections";
+import { SqlService } from "../models/SqlService";
 import { logger } from "../util";
-import { TableResponse, TableRow } from "../models/TableResponse";
 import Knex from "knex";
-import { User } from "../models/User";
 import { AggregationDef } from "../connectors";
-import { isNumber } from "lodash";
+import { v4 } from "uuid";
 
 const knex = Knex({
   client: "pg",
@@ -22,7 +17,6 @@ const knex = Knex({
     return `\`${value}\``;
   },
 });
-
 
 export class BigQuery extends SqlService {
   bigqueryClient: BigQueryLib;
@@ -44,14 +38,23 @@ export class BigQuery extends SqlService {
   }
 
   async makeQuery(query: string): Promise<any> {
+    const queryId = v4();
+    const queryStart = Date.now();
+
     const options = {
       query,
       location: this.LOCATION,
     };
 
+    logger.debug("Running query", { queryId, query });
+
     try {
       const [rows] = await this.bigqueryClient.query(options);
       const out = rows.map((row) => Object.values(row));
+      logger.debug("Query complete", {
+        queryId,
+        durationSeconds: (Date.now() - queryStart) / 1000,
+      });
       return out;
     } catch (e) {
       logger.error(e);
@@ -69,5 +72,4 @@ export class BigQuery extends SqlService {
     const res: string[][] = await this.makeQuery(query);
     return res.map((row) => row[0]);
   }
-
 }

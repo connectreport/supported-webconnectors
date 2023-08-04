@@ -14,7 +14,7 @@ const transport = new winston.transports.DailyRotateFile({
   dirname: path.join(process.env.ProgramData, "ConnectReport", "log", "native-webconnectors"),
   datePattern: "YYYY-MM-DD-HH",
   zippedArchive: true,
-  maxSize: "20m",
+  maxSize: "500m",
   maxFiles: "3d",
   level: settings.logLevel || "info",
 });
@@ -39,6 +39,7 @@ if (process.env.NODE_ENV !== "production") {
   logger.add(
     new winston.transports.Console({
       format: winston.format.simple(),
+      level: settings.logLevel || "info",
     })
   );
 }

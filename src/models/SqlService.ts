@@ -336,7 +336,7 @@ export abstract class SqlService {
         ...res.map(
           (row) =>
             ({
-              fieldName: `${tableName}.${row[0]}`,
+              fieldName: `${row[0]}`,
               fieldDef: `${row[0]}`,
               tableName: tableName,
               fieldType:

@@ -10,6 +10,7 @@ import snowflake from "snowflake-sdk";
 import type { Pool } from "generic-pool";
 import { AggregationDef } from "../connectors";
 import { logger } from "../util";
+import { v4 } from "uuid";
 
 class Deferred {
   resolve: any;
@@ -71,6 +72,11 @@ export class Snowflake extends SqlService {
 
   /** Send query to Snowflake */
   async makeQuery(query: string): Promise<any> {
+    const queryId = v4();
+    const queryStart = Date.now();
+
+    logger.debug("Running query", { queryId, query });
+
     const d = new Deferred();
     // Use the connection pool and execute a statement
     this.connection.execute({
@@ -79,7 +85,12 @@ export class Snowflake extends SqlService {
       complete: function (err, stmt, rows) {
         if (err) {
           d.reject(err);
+          return;
         }
+        logger.debug("Query complete", {
+          queryId,
+          durationSeconds: (Date.now() - queryStart) / 1000,
+        });
         d.resolve(rows?.map((row) => Object.values(row)));
       },
     });
