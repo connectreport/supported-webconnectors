@@ -34,6 +34,11 @@ export const formatCell = (cell: TableCell, field: Fields[number]) => {
       text: "-",
     };
   }
+  if (cell.text === '') {
+    return {
+      ...cell
+    };
+  }
   if (
     typeof cell.text !== "undefined" &&
     !isNaN(parseFloat(cell.text)) &&
