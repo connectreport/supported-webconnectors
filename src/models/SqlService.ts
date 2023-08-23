@@ -110,6 +110,11 @@ export abstract class SqlService {
             includesAgg = true;
           }
         }
+        if (field.aggregation && ["min", "max", "sum", "count", "avg"].includes(field.aggregation)) {
+          field.raw = knex.raw(`${field.aggregation}(${knex.client.config.wrapIdentifier(f.fieldDef)}) as ${knex.client.config.wrapIdentifier(`c${index}`)}`);
+          field.isAgg = true;
+          includesAgg = true;
+        }
         return field;
       });
 

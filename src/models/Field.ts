@@ -10,5 +10,6 @@ export type Field = {
   sortOrder?: string;
   totalsFunction?: "Min" | "Max" | "Avg" | "Sum" | "Count";
   tableName?: string;
+  aggregation?: "min" | "max" | "avg" | "sum" | "count";
 };
 export type Fields = Array<Field>;
