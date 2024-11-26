@@ -4,7 +4,7 @@ import { FieldValue } from "./FieldValues";
 import { Selections } from "./Selections";
 import { TableResponse, TableRow } from "./TableResponse";
 import { User } from "./User";
-import { AggregationDef } from "../connectors";
+import { AdditionalFieldDef } from "../connectors";
 
 export type MappedField = Field & {
   raw?: any;
@@ -14,19 +14,19 @@ export type MappedField = Field & {
 export abstract class SqlService {
   knex: Knex;
   sqlTypeForDimension: string = "STRING";
-  aggregations?: AggregationDef[];
+  additionalFields?: AdditionalFieldDef[];
   schema?: string;
   databaseName?: string;
 
   constructor(
     knex: Knex,
-    aggregations?: AggregationDef[],
+    additionalFields?: AdditionalFieldDef[],
     sqlTypeForDimension?: string,
     schema?: string,
     databaseName?: string
   ) {
     this.knex = knex;
-    this.aggregations = aggregations;
+    this.additionalFields = additionalFields;
     this.sqlTypeForDimension = sqlTypeForDimension || this.sqlTypeForDimension;
     this.schema = schema;
     this.databaseName = databaseName;
@@ -36,7 +36,7 @@ export abstract class SqlService {
 
   async getTotals(
     tableName: string,
-    fields: MappedField[],
+    fields: Field[],
     query: string
   ): Promise<TableRow> {
     let knex = this.knex;
@@ -100,14 +100,18 @@ export abstract class SqlService {
 
       const mappedFields: MappedField[] = fields.map((f, index) => {
         const field: MappedField = { ...f };
-        if (this.aggregations) {
-          const isAgg = this.aggregations.find(
+        if (this.additionalFields) {
+          const isAdditonalField = this.additionalFields.find(
             (a) => a.fieldIdentifier === f.fieldDef
           );
-          if (isAgg) {
-            field.raw = knex.raw(`${isAgg.sql} as ${knex.client.config.wrapIdentifier(`c${index}`)}`);
-            field.isAgg = true;
-            includesAgg = true;
+          if (isAdditonalField) {
+            field.raw = knex.raw(`${isAdditonalField.sql} as ${knex.client.config.wrapIdentifier(`c${index}`)}`);
+            if (isAdditonalField.fieldType === "measure") {
+              field.isAgg = true;
+              // if additional field is a measure, we need to include it in the group by clause
+              // measure additionaFields must always be aggregations
+              includesAgg = true;
+            }
           }
         }
         if (field.aggregation && ["min", "max", "sum", "count", "avg"].includes(field.aggregation)) {
@@ -141,12 +145,12 @@ export abstract class SqlService {
         .modify((query) => {
           selections.forEach((s) => {
             let resolvedCol: any = s.fieldDef;
-            if (this.aggregations) {
-              const isAgg = this.aggregations.find(
+            if (this.additionalFields) {
+              const additionalField = this.additionalFields.find(
                 (a) => a.fieldIdentifier === s.fieldDef
               );
-              if (isAgg) {
-                resolvedCol = knex.raw(isAgg.sql);
+              if (additionalField) {
+                resolvedCol = knex.raw(additionalField.sql);
               }
             }
             query.whereIn(
@@ -259,9 +263,9 @@ export abstract class SqlService {
       : null;
     let raw;
 
-    const isAgg = this.aggregations?.find((a) => a.fieldIdentifier === field);
-    if (isAgg) {
-      raw = knex.raw(`${isAgg.sql} as value`);
+    const additonalField = this.additionalFields?.find((a) => a.fieldIdentifier === field);
+    if (additonalField) {
+      raw = knex.raw(`${additonalField.sql} as value`);
     }
 
     const resolvedCol = raw || columnName;
@@ -324,13 +328,14 @@ export abstract class SqlService {
     const res: any[][] = await this.makeQuery(query);
 
     let additionalFields: Field[] = [];
-    if (this.aggregations) {
-      additionalFields = this.aggregations
+    if (this.additionalFields) {
+      additionalFields = this.additionalFields
         .filter((a) => a.sourceTable === tableName)
         .map((a) => ({
           fieldName: a.fieldIdentifier,
           fieldDef: a.fieldIdentifier,
           tableName: tableName,
+          isAggFromSettings: true,
           fieldType: a.fieldType as "dimension" | "measure",
         }));
     }

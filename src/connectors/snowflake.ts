@@ -1,14 +1,8 @@
-import axios from "axios";
-import { Field } from "../models/Field";
-import { FieldValue } from "../models/FieldValues";
-import { Selections } from "../models/Selections";
-import { MappedField, SqlService } from "../models/SqlService";
+import { SqlService } from "../models/SqlService";
 import Knex from "knex";
-import { TableResponse, TableRow } from "../models/TableResponse";
-import { User } from "../models/User";
-import snowflake from "snowflake-sdk";
+import snowflake, { Connection } from "snowflake-sdk";
 import type { Pool } from "generic-pool";
-import { AggregationDef } from "../connectors";
+import { AdditionalFieldDef } from "../connectors";
 import { logger } from "../util";
 import { v4 } from "uuid";
 
@@ -25,10 +19,10 @@ class Deferred {
 }
 
 export class Snowflake extends SqlService {
-  connection: snowflake.Connection;
+  pool: Pool<Connection>;
   DATABASE: string;
   SCHEMA: string;
-  aggregations?: AggregationDef[];
+  additionalFields?: AdditionalFieldDef[];
 
   constructor(
     ACCOUNT: string,
@@ -36,7 +30,7 @@ export class Snowflake extends SqlService {
     USERNAME: string,
     PASSWORD: string,
     SCHEMA: string,
-    aggregations?: AggregationDef[]
+    additionalFields?: AdditionalFieldDef[]
   ) {
     const knex = Knex({
       client: "pg",
@@ -45,13 +39,13 @@ export class Snowflake extends SqlService {
       },
     });
 
-    super(knex, aggregations, "TEXT", SCHEMA);
+    super(knex, additionalFields, "TEXT", SCHEMA);
 
     this.DATABASE = DATABASE;
     this.SCHEMA = SCHEMA;
-    this.aggregations = aggregations;
+    this.additionalFields = additionalFields;
 
-    this.connection = snowflake.createConnection(
+    this.pool = snowflake.createPool(
       // connection options
       {
         account: ACCOUNT,
@@ -59,14 +53,38 @@ export class Snowflake extends SqlService {
         password: PASSWORD,
         database: DATABASE,
         clientSessionKeepAlive: true
+      },
+      {
+        evictionRunIntervalMillis: 60000, // default = 0, off
+        idleTimeoutMillis: 60000, // default = 30000
+        max: 2,
+        min: 0,
       }
     );
-    this.connection.connect((err, conn) => {
-      if (err) {
+
+    this.checkPoolHealth()
+  }
+
+  async checkPoolHealth() {
+    this.pool.use(async (connection) => {
+      try {
+        const statement = connection.execute({
+          sqlText: 'SELECT 1',
+        });
+  
+        const stream = statement.streamRows();
+        stream.on('data', (row) => {
+          logger.info("Successfully connected to Snowflake.");
+        });
+  
+        stream.on('error', (err) => {
+          logger.error("Failed to connect to snowflake", { err });
+        });
+      } catch (err) {
         logger.error("Failed to connect to snowflake", { err });
-      } else {
-        logger.info("Successfully connected to Snowflake.");
       }
+    }).catch((err) => {
+      logger.error("Failed to connect to snowflake", { err });
     });
   }
 
@@ -79,21 +97,27 @@ export class Snowflake extends SqlService {
 
     const d = new Deferred();
     // Use the connection pool and execute a statement
-    this.connection.execute({
-      sqlText: query,
-      fetchAsString: ["Boolean", "Number", "Date", "JSON", "Buffer"],
-      complete: function (err, stmt, rows) {
-        if (err) {
-          d.reject(err);
-          return;
-        }
-        logger.debug("Query complete", {
-          queryId,
-          durationSeconds: (Date.now() - queryStart) / 1000,
-        });
-        d.resolve(rows?.map((row) => Object.values(row)));
-      },
+
+    this.pool.use(async(connection) => {
+      connection.execute({
+        sqlText: query,
+        fetchAsString: ["Boolean", "Number", "Date", "JSON", "Buffer"],
+        complete: function (err, stmt, rows) {
+          if (err) {
+            d.reject(err);
+            return;
+          }
+          logger.debug("Query complete", {
+            queryId,
+            durationSeconds: (Date.now() - queryStart) / 1000,
+          });
+          d.resolve(rows?.map((row) => Object.values(row)));
+        },
+      });
+    }).catch((err) => {
+      logger.error("Failed to connect to snowflake", { err });
     });
+
     return d.promise;
   }
 

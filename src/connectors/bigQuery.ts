@@ -8,7 +8,7 @@ import { BigQuery as BigQueryLib } from "@google-cloud/bigquery";
 import { SqlService } from "../models/SqlService";
 import { logger } from "../util";
 import Knex from "knex";
-import { AggregationDef } from "../connectors";
+import { AdditionalFieldDef } from "../connectors";
 import { v4 } from "uuid";
 
 const knex = Knex({
@@ -22,17 +22,17 @@ export class BigQuery extends SqlService {
   bigqueryClient: BigQueryLib;
   DATABASE: string;
   LOCATION: string;
-  aggregations?: AggregationDef[];
+  additionalFields?: AdditionalFieldDef[];
 
   constructor(
     DATABASE: string,
     LOCATION: string,
-    aggregations?: AggregationDef[]
+    additionalFields?: AdditionalFieldDef[]
   ) {
-    super(knex, aggregations, "STRING", undefined, DATABASE);
+    super(knex, additionalFields, "STRING", undefined, DATABASE);
     this.DATABASE = DATABASE;
     this.LOCATION = LOCATION;
-    this.aggregations = aggregations;
+    this.additionalFields = additionalFields;
 
     this.bigqueryClient = new BigQueryLib();
   }
